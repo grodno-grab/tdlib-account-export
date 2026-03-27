@@ -213,6 +213,8 @@ class ChatManager final : public Actor {
 
   void on_get_inactive_channels(vector<tl_object_ptr<telegram_api::Chat>> &&chats, Promise<Unit> &&promise);
 
+  void on_get_left_channels(vector<tl_object_ptr<telegram_api::Chat>> &&chats, Promise<Unit> &&promise);
+
   void remove_inactive_channel(ChannelId channel_id);
 
   void register_message_channels(MessageFullId message_full_id, vector<ChannelId> channel_ids);
@@ -329,6 +331,13 @@ class ChatManager final : public Actor {
   vector<DialogId> get_dialogs_for_discussion(Promise<Unit> &&promise);
 
   vector<DialogId> get_inactive_channels(Promise<Unit> &&promise);
+
+  vector<DialogId> get_left_channels(int64 takeout_id, int32 offset, Promise<Unit> &&promise);
+
+  void init_takeout_session(bool message_users, bool message_chats, bool message_megagroups,
+                            bool message_channels, Promise<int64> &&promise);
+
+  void finish_takeout_session(int64 takeout_id, bool success, Promise<Unit> &&promise);
 
   void create_new_chat(const vector<UserId> &user_ids, const string &title, MessageTtl message_ttl,
                        Promise<td_api::object_ptr<td_api::createdBasicGroupChat>> &&promise);
@@ -951,6 +960,8 @@ class ChatManager final : public Actor {
 
   void on_create_inactive_channels(vector<ChannelId> &&channel_ids, Promise<Unit> &&promise);
 
+  void on_create_left_channels(vector<ChannelId> &&channel_ids, Promise<Unit> &&promise);
+
   void update_dialogs_for_discussion(DialogId dialog_id, bool is_suitable);
 
   void get_channel_statistics_dc_id_impl(ChannelId channel_id, bool for_full_statistics, Promise<DcId> &&promise);
@@ -993,6 +1004,9 @@ class ChatManager final : public Actor {
 
   bool inactive_channel_ids_inited_ = false;
   vector<ChannelId> inactive_channel_ids_;
+
+  bool left_channel_ids_ready_ = false;
+  vector<DialogId> left_channel_dialog_ids_;
 
   FlatHashMap<ChatId, vector<Promise<Unit>>, ChatIdHash> load_chat_from_database_queries_;
   FlatHashSet<ChatId, ChatIdHash> loaded_from_database_chats_;

@@ -1538,6 +1538,147 @@ class GetInactiveChannelsQuery final : public Td::ResultHandler {
   }
 };
 
+// Serializes invokeWithTakeout#aca9fd2e wrapping any inner MTProto function.
+class TakeoutFunctionWrapper final : public telegram_api::Function {
+  int64 takeout_id_;
+  tl_object_ptr<telegram_api::Function> inner_;
+
+ public:
+  static constexpr int32 ID = static_cast<int32>(0xaca9fd2e);
+
+  TakeoutFunctionWrapper(int64 takeout_id, tl_object_ptr<telegram_api::Function> inner)
+      : takeout_id_(takeout_id), inner_(std::move(inner)) {
+  }
+
+  int32 get_id() const final {
+    return ID;
+  }
+
+  void store(TlStorerCalcLength &s) const final {
+    s.store_binary(ID);
+    s.store_binary(takeout_id_);
+    inner_->store(s);
+  }
+
+  void store(TlStorerUnsafe &s) const final {
+    s.store_binary(ID);
+    s.store_binary(takeout_id_);
+    inner_->store(s);
+  }
+
+  void store(TlStorerToString &s, const char *field_name) const final {
+    s.store_class_begin(field_name, "invokeWithTakeout");
+    s.store_field("takeout_id", takeout_id_);
+    inner_->store(s, "query");
+    s.store_class_end();
+  }
+};
+
+class GetLeftChannelsQuery final : public Td::ResultHandler {
+  Promise<Unit> promise_;
+
+ public:
+  explicit GetLeftChannelsQuery(Promise<Unit> &&promise) : promise_(std::move(promise)) {
+  }
+
+  void send(int64 takeout_id, int32 offset) {
+    send_query(G()->net_query_creator().create(TakeoutFunctionWrapper(
+        takeout_id, telegram_api::make_object<telegram_api::channels_getLeftChannels>(offset))));
+  }
+
+  void on_result(BufferSlice packet) final {
+    auto result_ptr = fetch_result<telegram_api::channels_getLeftChannels>(packet);
+    if (result_ptr.is_error()) {
+      return on_error(result_ptr.move_as_error());
+    }
+    auto chats_ptr = result_ptr.move_as_ok();
+    LOG(INFO) << "Receive result for GetLeftChannelsQuery: " << to_string(chats_ptr);
+    vector<tl_object_ptr<telegram_api::Chat>> chats;
+    switch (chats_ptr->get_id()) {
+      case telegram_api::messages_chats::ID:
+        chats = std::move(move_tl_object_as<telegram_api::messages_chats>(chats_ptr)->chats_);
+        break;
+      case telegram_api::messages_chatsSlice::ID:
+        chats = std::move(move_tl_object_as<telegram_api::messages_chatsSlice>(chats_ptr)->chats_);
+        break;
+      default:
+        UNREACHABLE();
+    }
+    td_->chat_manager_->on_get_left_channels(std::move(chats), std::move(promise_));
+  }
+
+  void on_error(Status status) final {
+    promise_.set_error(std::move(status));
+  }
+};
+
+class InitTakeoutSessionQuery final : public Td::ResultHandler {
+  Promise<int64> promise_;
+
+ public:
+  explicit InitTakeoutSessionQuery(Promise<int64> &&promise) : promise_(std::move(promise)) {
+  }
+
+  void send(bool message_users, bool message_chats, bool message_megagroups, bool message_channels) {
+    int32 flags = 0;
+    if (message_users) {
+      flags |= 2;  // flags.1
+    }
+    if (message_chats) {
+      flags |= 4;  // flags.2
+    }
+    if (message_megagroups) {
+      flags |= 8;  // flags.3
+    }
+    if (message_channels) {
+      flags |= 16;  // flags.4
+    }
+    send_query(G()->net_query_creator().create(telegram_api::account_initTakeoutSession(
+        flags, false, message_users, message_chats, message_megagroups, message_channels, false, 0)));
+  }
+
+  void on_result(BufferSlice packet) final {
+    auto result_ptr = fetch_result<telegram_api::account_initTakeoutSession>(packet);
+    if (result_ptr.is_error()) {
+      return on_error(result_ptr.move_as_error());
+    }
+    auto result = result_ptr.move_as_ok();
+    LOG(INFO) << "Receive result for InitTakeoutSessionQuery: takeout_id=" << result->id_;
+    promise_.set_value(std::move(result->id_));
+  }
+
+  void on_error(Status status) final {
+    promise_.set_error(std::move(status));
+  }
+};
+
+class FinishTakeoutSessionQuery final : public Td::ResultHandler {
+  Promise<Unit> promise_;
+
+ public:
+  explicit FinishTakeoutSessionQuery(Promise<Unit> &&promise) : promise_(std::move(promise)) {
+  }
+
+  void send(int64 takeout_id, bool success) {
+    int32 flags = success ? 1 : 0;  // flags.0 = SUCCESS
+    send_query(G()->net_query_creator().create(
+        telegram_api::account_finishTakeoutSession(flags, success)));
+  }
+
+  void on_result(BufferSlice packet) final {
+    auto result_ptr = fetch_result<telegram_api::account_finishTakeoutSession>(packet);
+    if (result_ptr.is_error()) {
+      return on_error(result_ptr.move_as_error());
+    }
+    LOG(INFO) << "Receive result for FinishTakeoutSessionQuery";
+    promise_.set_value(Unit());
+  }
+
+  void on_error(Status status) final {
+    promise_.set_error(std::move(status));
+  }
+};
+
 class GetChatsQuery final : public Td::ResultHandler {
   Promise<Unit> promise_;
 
@@ -4329,6 +4470,54 @@ void ChatManager::remove_inactive_channel(ChannelId channel_id) {
   if (inactive_channel_ids_inited_ && td::remove(inactive_channel_ids_, channel_id)) {
     LOG(DEBUG) << "Remove " << channel_id << " from list of inactive channels";
   }
+}
+
+vector<DialogId> ChatManager::get_left_channels(int64 takeout_id, int32 offset, Promise<Unit> &&promise) {
+  if (left_channel_ids_ready_) {
+    left_channel_ids_ready_ = false;
+    auto result = std::move(left_channel_dialog_ids_);
+    left_channel_dialog_ids_.clear();
+    promise.set_value(Unit());
+    return result;
+  }
+  td_->create_handler<GetLeftChannelsQuery>(std::move(promise))->send(takeout_id, offset);
+  return {};
+}
+
+void ChatManager::on_get_left_channels(vector<tl_object_ptr<telegram_api::Chat>> &&chats,
+                                        Promise<Unit> &&promise) {
+  auto channel_ids = get_channel_ids(std::move(chats), "on_get_left_channels");
+
+  MultiPromiseActorSafe mpas{"GetLeftChannelsMultiPromiseActor"};
+  mpas.add_promise(PromiseCreator::lambda(
+      [actor_id = actor_id(this), channel_ids, promise = std::move(promise)](Unit) mutable {
+        send_closure(actor_id, &ChatManager::on_create_left_channels, std::move(channel_ids),
+                     std::move(promise));
+      }));
+  mpas.set_ignore_errors(true);
+  auto lock_promise = mpas.get_promise();
+
+  for (auto channel_id : channel_ids) {
+    td_->messages_manager_->create_dialog(DialogId(channel_id), false, mpas.get_promise());
+  }
+
+  lock_promise.set_value(Unit());
+}
+
+void ChatManager::on_create_left_channels(vector<ChannelId> &&channel_ids, Promise<Unit> &&promise) {
+  left_channel_ids_ready_ = true;
+  left_channel_dialog_ids_ = DialogId::get_dialog_ids(channel_ids);
+  promise.set_value(Unit());
+}
+
+void ChatManager::init_takeout_session(bool message_users, bool message_chats, bool message_megagroups,
+                                        bool message_channels, Promise<int64> &&promise) {
+  td_->create_handler<InitTakeoutSessionQuery>(std::move(promise))->send(
+      message_users, message_chats, message_megagroups, message_channels);
+}
+
+void ChatManager::finish_takeout_session(int64 takeout_id, bool success, Promise<Unit> &&promise) {
+  td_->create_handler<FinishTakeoutSessionQuery>(std::move(promise))->send(takeout_id, success);
 }
 
 void ChatManager::register_message_channels(MessageFullId message_full_id, vector<ChannelId> channel_ids) {

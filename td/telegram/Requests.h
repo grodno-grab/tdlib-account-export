@@ -444,6 +444,12 @@ class Requests {
 
   void on_request(uint64 id, const td_api::getInactiveSupergroupChats &request);
 
+  void on_request(uint64 id, const td_api::getLeftChats &request);
+
+  void on_request(uint64 id, const td_api::initTakeoutSession &request);
+
+  void on_request(uint64 id, const td_api::finishTakeoutSession &request);
+
   void on_request(uint64 id, const td_api::getSuitablePersonalChats &request);
 
   void on_request(uint64 id, const td_api::openChat &request);

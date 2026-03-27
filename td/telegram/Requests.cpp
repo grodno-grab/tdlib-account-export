@@ -527,6 +527,28 @@ class GetInactiveSupergroupChatsRequest final : public RequestActor<> {
   }
 };
 
+class GetLeftChatsRequest final : public RequestActor<> {
+  int64 takeout_session_id_;
+  int32 offset_;
+  vector<DialogId> dialog_ids_;
+
+  void do_run(Promise<Unit> &&promise) final {
+    dialog_ids_ =
+        td_->chat_manager_->get_left_channels(takeout_session_id_, offset_, std::move(promise));
+  }
+
+  void do_send_result() final {
+    send_result(td_->dialog_manager_->get_chats_object(-1, dialog_ids_, "GetLeftChatsRequest"));
+  }
+
+ public:
+  GetLeftChatsRequest(ActorShared<Td> td, uint64 request_id, int64 takeout_session_id, int32 offset)
+      : RequestActor(std::move(td), request_id),
+        takeout_session_id_(takeout_session_id),
+        offset_(offset) {
+  }
+};
+
 class SearchRecentlyFoundChatsRequest final : public RequestActor<> {
   string query_;
   int32 limit_;
@@ -3311,6 +3333,34 @@ void Requests::on_request(uint64 id, const td_api::getSuitableDiscussionChats &r
 void Requests::on_request(uint64 id, const td_api::getInactiveSupergroupChats &request) {
   CHECK_IS_USER();
   CREATE_NO_ARGS_REQUEST(GetInactiveSupergroupChatsRequest);
+}
+
+void Requests::on_request(uint64 id, const td_api::getLeftChats &request) {
+  CHECK_IS_USER();
+  CREATE_REQUEST(GetLeftChatsRequest, request.takeout_session_id_, request.offset_);
+}
+
+void Requests::on_request(uint64 id, const td_api::initTakeoutSession &request) {
+  CHECK_IS_USER();
+  CREATE_REQUEST_PROMISE();
+  auto query_promise =
+      PromiseCreator::lambda([promise = std::move(promise)](Result<int64> result) mutable {
+        if (result.is_error()) {
+          promise.set_error(result.move_as_error());
+        } else {
+          promise.set_value(td_api::make_object<td_api::takeoutSession>(result.ok()));
+        }
+      });
+  td_->chat_manager_->init_takeout_session(request.message_users_, request.message_chats_,
+                                            request.message_megagroups_, request.message_channels_,
+                                            std::move(query_promise));
+}
+
+void Requests::on_request(uint64 id, const td_api::finishTakeoutSession &request) {
+  CHECK_IS_USER();
+  CREATE_OK_REQUEST_PROMISE();
+  td_->chat_manager_->finish_takeout_session(request.takeout_session_id_, request.success_,
+                                              std::move(promise));
 }
 
 void Requests::on_request(uint64 id, const td_api::getSuitablePersonalChats &request) {

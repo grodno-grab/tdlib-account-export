@@ -10393,6 +10393,9 @@ testVectorIntObject value:vector<testInt> = TestVectorIntObject;
 testVectorString value:vector<string> = TestVectorString;
 //@description A simple object containing a vector of objects that hold a string; for testing only @value Vector of objects
 testVectorStringObject value:vector<testString> = TestVectorStringObject;
+//@description Contains a takeout session identifier @id Takeout session identifier
+takeoutSession id:int64 = TakeoutSession;
+
 
 ---functions---
 
@@ -10777,6 +10780,23 @@ getSuitableDiscussionChats = Chats;
 
 //@description Returns a list of recently inactive supergroups and channels. Can be used when user reaches limit on the number of joined supergroups and channels and receives the error "CHANNELS_TOO_MUCH". Also, the limit can be increased with Telegram Premium
 getInactiveSupergroupChats = Chats;
+//@description Initializes a takeout session to export the current user's data. Must be finalized with finishTakeoutSession
+//@message_users True, if private chats and chats with bots need to be included
+//@message_chats True, if basic group chats need to be included
+//@message_megagroups True, if supergroup chats need to be included
+//@message_channels True, if channels need to be included
+initTakeoutSession message_users:Bool message_chats:Bool message_megagroups:Bool message_channels:Bool = TakeoutSession;
+
+//@description Finishes or cancels a previously started takeout session
+//@takeout_session_id Identifier of the takeout session returned by initTakeoutSession
+//@success Pass true if all data has been successfully transferred; pass false to cancel the session
+finishTakeoutSession takeout_session_id:int64 success:Bool = Ok;
+
+//@description Returns supergroups and channels that the current user has left. Requires an active takeout session
+//@takeout_session_id Identifier of the takeout session returned by initTakeoutSession
+//@offset Number of chats to skip; pass 0 for the first request
+getLeftChats takeout_session_id:int64 offset:int32 = Chats;
+
 
 //@description Returns a list of channel chats, which can be used as a personal chat
 getSuitablePersonalChats = Chats;
