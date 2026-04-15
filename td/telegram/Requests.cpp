@@ -3983,6 +3983,11 @@ void Requests::on_request(uint64 id, const td_api::deleteChatMessagesBySender &r
                                                                 std::move(promise));
 }
 
+void Requests::on_request(uint64 id, const td_api::resetChatLocalDeletedMessages &request) {
+  CREATE_OK_REQUEST_PROMISE();
+  td_->messages_manager_->reset_dialog_local_deleted_message_ids(DialogId(request.chat_id_), std::move(promise));
+}
+
 void Requests::on_request(uint64 id, const td_api::deleteChatMessagesByDate &request) {
   CHECK_IS_USER();
   CREATE_OK_REQUEST_PROMISE();

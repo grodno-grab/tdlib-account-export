@@ -11273,6 +11273,9 @@ deleteMessages chat_id:int53 message_ids:vector<int53> revoke:Bool = Ok;
 //@description Deletes all messages sent by the specified message sender in a chat. Supported only for supergroups; requires can_delete_messages administrator right @chat_id Chat identifier @sender_id Identifier of the sender of messages to delete
 deleteChatMessagesBySender chat_id:int53 sender_id:MessageSender = Ok;
 
+//@description Clears the local list of deleted message identifiers for a chat, allowing messages to be re-fetched from the server. Can be used to fix cases when messages are still present on the server but are ignored locally due to a failed bulk delete operation @chat_id Chat identifier
+resetChatLocalDeletedMessages chat_id:int53 = Ok;
+
 //@description Deletes all messages between the specified dates in a chat. Supported only for private chats and basic groups. Messages sent in the last 30 seconds will not be deleted
 //@chat_id Chat identifier
 //@min_date The minimum date of the messages to delete

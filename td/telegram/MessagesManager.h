@@ -394,6 +394,8 @@ class MessagesManager final : public Actor {
 
   void delete_local_dialog_messages_by_date(DialogId dialog_id, int32 min_date, int32 max_date);
 
+  void reset_dialog_local_deleted_message_ids(DialogId dialog_id, Promise<Unit> &&promise);
+
   void on_dialog_deleted(DialogId dialog_id, Promise<Unit> &&promise);
 
   void on_update_dialog_group_call_rights(DialogId dialog_id);

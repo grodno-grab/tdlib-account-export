@@ -604,6 +604,8 @@ class Requests {
 
   void on_request(uint64 id, const td_api::deleteChatMessagesBySender &request);
 
+  void on_request(uint64 id, const td_api::resetChatLocalDeletedMessages &request);
+
   void on_request(uint64 id, const td_api::deleteChatMessagesByDate &request);
 
   void on_request(uint64 id, const td_api::readAllChatMentions &request);

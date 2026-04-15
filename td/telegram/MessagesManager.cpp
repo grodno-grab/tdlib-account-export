@@ -8238,6 +8238,16 @@ void MessagesManager::on_failed_message_deletion(DialogId dialog_id, const vecto
   get_messages_from_server(std::move(message_full_ids), Promise<Unit>(), "on_failed_message_deletion");
 }
 
+void MessagesManager::reset_dialog_local_deleted_message_ids(DialogId dialog_id, Promise<Unit> &&promise) {
+  TRY_STATUS_PROMISE(promise, G()->close_status());
+  Dialog *d = get_dialog_force(dialog_id, "reset_dialog_local_deleted_message_ids");
+  if (d == nullptr) {
+    return promise.set_error(400, "Chat not found");
+  }
+  d->deleted_message_ids = WaitFreeHashSet<MessageId, MessageIdHash>();
+  promise.set_value(Unit());
+}
+
 void MessagesManager::on_scheduled_messages_deleted(DialogId dialog_id, const vector<MessageId> &message_ids) {
   Dialog *d = get_dialog(dialog_id);
   CHECK(d != nullptr);
